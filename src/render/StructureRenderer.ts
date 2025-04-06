@@ -79,6 +79,7 @@ interface StructureRendererOptions {
 	facesPerBuffer?: number,
 	chunkSize?: number,
 	useInvisibleBlockBuffer?: boolean,
+	useUndefinedBlocksBuffer?: boolean,
 }
 
 export class StructureRenderer extends Renderer {
@@ -88,8 +89,10 @@ export class StructureRenderer extends Renderer {
 	private gridMesh: Mesh = new Mesh()
 	private readonly outlineMesh: Mesh = new Mesh()
 	private invisibleBlocksMesh: Mesh = new Mesh()
+	private undefinedBlocksMesh: Mesh = new Mesh()
 	private readonly atlasTexture: WebGLTexture
 	public useInvisibleBlocks: boolean
+	public useUndefinedBlocks: boolean
 
 	private readonly chunkBuilder: ChunkBuilder
 
@@ -109,6 +112,7 @@ export class StructureRenderer extends Renderer {
 			console.warn('[deepslate renderer warning]: facesPerBuffer option has been removed in favor of chunkSize')
 		}
 		this.useInvisibleBlocks = options?.useInvisibleBlockBuffer ?? true
+		this.useUndefinedBlocks = options?.useUndefinedBlocksBuffer ?? true
 
 		this.gridShaderProgram = new ShaderProgram(gl, vsGrid, fsGrid).getProgram()
 		this.colorShaderProgram = new ShaderProgram(gl, vsColor, fsColor).getProgram()
@@ -116,6 +120,7 @@ export class StructureRenderer extends Renderer {
 		this.gridMesh = this.getGridMesh()
 		this.outlineMesh = this.getOutlineMesh()
 		this.invisibleBlocksMesh = this.getInvisibleBlocksMesh()
+		this.undefinedBlocksMesh = this.getUndefinedBlockMesh()
 		this.atlasTexture = this.createAtlasTexture(this.resources.getTextureAtlas())
 	}
 
@@ -124,6 +129,7 @@ export class StructureRenderer extends Renderer {
 		this.chunkBuilder.setStructure(structure)
 		this.gridMesh = this.getGridMesh()
 		this.invisibleBlocksMesh = this.getInvisibleBlocksMesh()
+		this.undefinedBlocksMesh = this.getUndefinedBlockMesh()
 	}
 
 	public updateStructureBuffers(chunkPositions?: vec3[]): void {
@@ -188,6 +194,33 @@ export class StructureRenderer extends Renderer {
 		return mesh
 	}
 
+	private getUndefinedBlockMesh(): Mesh {
+		const mesh = new Mesh()
+		if (!this.useUndefinedBlocks) {
+			return mesh
+		}
+
+		const size = this.structure.getSize()
+
+		for (let x = 0; x < size[0]; x += 1) {
+			for (let y = 0; y < size[1]; y += 1) {
+				for (let z = 0; z < size[2]; z += 1) {
+					const block = this.structure.getBlock([x, y, z])
+					if (block === undefined) {
+						mesh.addLineCube(x + 0.125, y + 0.125, z + 0.125, x + 0.875, y + 0.875, z + 0.875, [1, 0, 1])
+					} else if (block === null) {
+					} else if (block.state.is(BlockState.AIR)) {
+					} else if (block.state.is(new BlockState('cave_air'))) {
+					} else {
+						mesh.addLineCube(x + 0.125, y + 0.125, z + 0.125, x + 0.875, y + 0.875, z + 0.875, [1, 0, 1])
+					}
+				}
+			}
+		}
+
+		return mesh
+	}
+
 	public drawGrid(viewMatrix: mat4) {
 		this.setShader(this.gridShaderProgram)
 		this.prepareDraw(viewMatrix)
@@ -203,6 +236,16 @@ export class StructureRenderer extends Renderer {
 		this.prepareDraw(viewMatrix)
 
 		this.drawMesh(this.invisibleBlocksMesh, { pos: true, color: true })
+	}
+
+	public drawUndefinedBlocks(viewMatrix: mat4) {
+		if (!this.useUndefinedBlocks) {
+			return
+		}
+		this.setShader(this.gridShaderProgram)
+		this.prepareDraw(viewMatrix)
+
+		this.drawMesh(this.undefinedBlocksMesh, { pos: true, color: true })
 	}
 
 	public drawStructure(viewMatrix: mat4) {
