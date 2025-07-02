@@ -148,23 +148,25 @@ export class Renderer {
 	}
 
 	protected drawMesh(mesh: Mesh, options: { pos?: boolean, color?: boolean, texture?: boolean, normal?: boolean, blockPos?: boolean, sort?: boolean }) {
-    // If the mesh is intended for transparent rendering, sort the quads.
-    if (mesh.quadVertices() > 0 && options.sort) {
-			const cameraPos = this.extractCameraPositionFromView()
-			mesh.quads.sort((a, b) => {
-				const centerA = Renderer.computeQuadCenter(a)
-				const centerB = Renderer.computeQuadCenter(b)
-				const distA = vec3.distance(cameraPos, centerA)
-				const distB = vec3.distance(cameraPos, centerB)
-				return distB - distA // Sort in descending order (farthest first)
-			})
-      mesh.setDirty({
-        quads: true,
-      })
-    }
+    // If the mesh is too large, split it into smaller meshes
+    const meshes = mesh.split()
 
-		// If the mesh is too large, split it into smaller meshes
-		const meshes = mesh.split()
+    for (const m of meshes) {
+      // If the mesh is intended for transparent rendering, sort the quads.
+      if (mesh.quadVertices() > 0 && options.sort) {
+        const cameraPos = this.extractCameraPositionFromView()
+        mesh.quads.sort((a, b) => {
+          const centerA = Renderer.computeQuadCenter(a)
+          const centerB = Renderer.computeQuadCenter(b)
+          const distA = vec3.distance(cameraPos, centerA)
+          const distB = vec3.distance(cameraPos, centerB)
+          return distB - distA // Sort in descending order (farthest first)
+        })
+        mesh.setDirty({
+          quads: true,
+        })
+      }
+    }
 
 		// We rebuild mesh only right before we render to avoid multiple rebuild
 		// Mesh will keep tracking whether itself is dirty or not to avoid unnecessary rebuild as well
