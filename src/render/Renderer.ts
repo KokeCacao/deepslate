@@ -150,14 +150,17 @@ export class Renderer {
 	protected drawMesh(mesh: Mesh, options: { pos?: boolean, color?: boolean, texture?: boolean, normal?: boolean, blockPos?: boolean, sort?: boolean }) {
     // If the mesh is intended for transparent rendering, sort the quads.
     if (mesh.quadVertices() > 0 && options.sort) {
-				const cameraPos = this.extractCameraPositionFromView()
-        mesh.quads.sort((a, b) => {
-            const centerA = Renderer.computeQuadCenter(a)
-            const centerB = Renderer.computeQuadCenter(b)
-            const distA = vec3.distance(cameraPos, centerA)
-            const distB = vec3.distance(cameraPos, centerB)
-            return distB - distA // Sort in descending order (farthest first)
-        })
+			const cameraPos = this.extractCameraPositionFromView()
+			mesh.quads.sort((a, b) => {
+				const centerA = Renderer.computeQuadCenter(a)
+				const centerB = Renderer.computeQuadCenter(b)
+				const distA = vec3.distance(cameraPos, centerA)
+				const distB = vec3.distance(cameraPos, centerB)
+				return distB - distA // Sort in descending order (farthest first)
+			})
+      mesh.setDirty({
+        quads: true,
+      })
     }
 
 		// If the mesh is too large, split it into smaller meshes
