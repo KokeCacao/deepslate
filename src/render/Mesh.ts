@@ -9,6 +9,7 @@ export class Mesh {
 	public posBuffer: WebGLBuffer | undefined
 	public colorBuffer: WebGLBuffer | undefined
 	public textureBuffer: WebGLBuffer | undefined
+	public textureLimitBuffer: WebGLBuffer | undefined
 	public normalBuffer: WebGLBuffer | undefined
 	public blockPosBuffer: WebGLBuffer | undefined
 	public indexBuffer: WebGLBuffer | undefined
@@ -188,6 +189,7 @@ export class Mesh {
 		}
 		if (options.texture && this.textureBufferDirty) {
 			this.textureBuffer = rebuildBufferV(this.quads, this.textureBuffer, v => v.texture)
+			this.textureLimitBuffer = rebuildBufferV(this.quads, this.textureLimitBuffer, v => v.textureLimit)
 			this.textureBufferDirty = false
 		}
 		if (options.normal && this.normalBufferDirty) {
