@@ -143,6 +143,8 @@ export class BlockModel {
 			const [u0, v0, u1, v1] = atlas.getTextureUV(this.getTexture(face.texture))
 			const du = (u1 - u0) / 16
 			const dv = (v1 - v0) / 16
+			const duu = atlas.getPixelSize() * 0.5
+			const dvv = atlas.getPixelSize() * 0.5
 			uv[0] = (face.uv?.[0] ?? uv[0]) * du
 			uv[1] = (face.uv?.[1] ?? uv[1]) * dv
 			uv[2] = (face.uv?.[2] ?? uv[2]) * du
@@ -156,7 +158,12 @@ export class BlockModel {
 				u0 + uv[r[2]], v0 + uv[r[3]],
 				u0 + uv[r[4]], v0 + uv[r[5]],
 				u0 + uv[r[6]], v0 + uv[r[7]],
-			], [u0 + Math.min(uv[0], uv[2]), v0 + Math.min(uv[1], uv[3]), u0 + Math.max(uv[0], uv[2]), v0 + Math.max(uv[1], uv[3])])
+			], [
+				u0 + Math.min(uv[0], uv[2]) + duu,
+				v0 + Math.min(uv[1], uv[3]) + dvv,
+				u0 + Math.max(uv[0], uv[2]) - duu,
+				v0 + Math.max(uv[1], uv[3]) - dvv,
+			])
 			mesh.quads.push(quad)
 		}
 	

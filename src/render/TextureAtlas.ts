@@ -6,11 +6,12 @@ export type UV = [number, number, number, number]
 export interface TextureAtlasProvider {
 	getTextureAtlas(): ImageData
 	getTextureUV(texture: Identifier): UV
-	getPixelSize?(): number;
+	getPixelSize(): number;
 }
 
 export class TextureAtlas implements TextureAtlasProvider {
 	private readonly part: number
+	private readonly pixelSize: number
 
 	constructor(
 		private readonly img: ImageData,
@@ -20,6 +21,7 @@ export class TextureAtlas implements TextureAtlasProvider {
 			throw new Error(`Expected texture atlas dimensions to be powers of two, got ${img.width}x${img.height}.`)
 		}
 		this.part = 16 / img.width
+		this.pixelSize = 1.0 / img.width
 	}
 
 	public getTextureAtlas() {
@@ -31,7 +33,7 @@ export class TextureAtlas implements TextureAtlasProvider {
 	}
 
 	public getPixelSize() {
-		return this.part / 16
+		return this.pixelSize
 	}
 
 	public static async fromBlobs(textures: { [id: string]: Blob }): Promise<TextureAtlas> {   
