@@ -28,6 +28,10 @@ export class BlockState {
 		return this.properties[key]
 	}
 
+	public isAir() {
+		return this.is(BlockState.AIR)
+	}
+
 	public isFluid() {
 		return this.is(BlockState.WATER) || this.is(BlockState.LAVA)
 	}

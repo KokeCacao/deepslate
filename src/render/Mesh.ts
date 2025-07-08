@@ -79,6 +79,35 @@ export class Mesh {
 		return this
 	}
 
+	public mergeAll(others: Mesh[]): this {
+		let newQuadsCount = 0
+		let newLinesCount = 0
+		for (const other of others) {
+			newQuadsCount += other.quads.length
+			newLinesCount += other.lines.length
+		}
+
+		const oldQuadsLen = this.quads.length
+		const oldLinesLen = this.lines.length
+		this.quads.length = oldQuadsLen + newQuadsCount
+		this.lines.length = oldLinesLen + newLinesCount
+
+		let quadOffset = oldQuadsLen
+		let lineOffset = oldLinesLen
+
+		for (const other of others) {
+			for (const q of other.quads) {
+				this.quads[quadOffset++] = q
+			}
+			for (const l of other.lines) {
+				this.lines[lineOffset++] = l
+			}
+		}
+
+		this.setDirty({ quads: true, lines: true })
+		return this
+	}
+
 	public addLine(x1: number, y1: number, z1: number, x2: number, y2: number, z2: number, color: Color) {
 		const line = new Line(
 			Vertex.fromPos(new Vector(x1, y1, z1)),
