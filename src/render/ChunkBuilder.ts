@@ -1,6 +1,7 @@
 import { mat4, vec3 } from 'gl-matrix'
 import type { PlacedBlock, Resources, StructureProvider } from '../index.js'
 import { BlockPos, Direction, Vector } from '../index.js'
+import { radixSortFloat32WithKeys } from '../util/Sort.js'
 import { Mesh } from './Mesh.js'
 import { SpecialRenderers } from './SpecialRenderer.js'
 
@@ -150,6 +151,30 @@ export class ChunkBuilder {
     }
   }
 
+  protected sortChunkListByDistance(
+		chunkList: Array<{ chunk: Chunk; center: vec3 }>,
+		cameraPos: vec3
+	): void {
+		const n: number = chunkList.length;
+		if (n === 0) return;
+
+		const negDistances: Float32Array = new Float32Array(n);
+		for (let i: number = 0; i < n; i++) {
+			negDistances[i] = -vec3.squaredDistance(chunkList[i].center, cameraPos);
+		}
+
+		const {
+			sortedValues: _ignored,
+			sortedKeys: sortedList,
+		}: {
+			sortedValues: Float32Array;
+			sortedKeys: Array<{ chunk: Chunk; center: vec3 }>;
+		} = radixSortFloat32WithKeys(negDistances, chunkList);
+
+		chunkList.length = 0;
+		chunkList.push(...sortedList);
+	}
+
   public getTransparentMeshes(cameraPos: vec3): Mesh[] {
     const chunkList: { chunk: Chunk; center: vec3 }[] = []
 
@@ -173,12 +198,8 @@ export class ChunkBuilder {
         }
       }
     }
-
-    chunkList.sort((a, b) => {
-      const distA = vec3.squaredDistance(a.center, cameraPos)
-      const distB = vec3.squaredDistance(b.center, cameraPos)
-      return distB - distA
-    })
+		
+		this.sortChunkListByDistance(chunkList, cameraPos)
 
     return chunkList
       .map(item => item.chunk.getTransparentMesh())

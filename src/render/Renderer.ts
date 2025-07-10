@@ -1,7 +1,9 @@
 import { mat4, vec3 } from 'gl-matrix'
+import { radixSortFloat32WithKeys } from '../util/Sort.js'
 import type { Mesh } from './Mesh.js'
 import type { Quad } from './Quad.js'
 import { ShaderProgram } from './ShaderProgram.js'
+
 const vsSource = `
   attribute vec4 vertPos;
   attribute vec2 texCoord;
@@ -172,6 +174,48 @@ export class Renderer {
     return vec3.fromValues(center[0], center[1], center[2])
   }
 
+  public static sortQuadsByDistanceOld(mesh: Mesh, cameraPos: vec3) {
+    if (mesh.quadVertices() === 0) return
+
+    mesh.quads.sort((a: Quad, b: Quad) => {
+      const centerA = Renderer.computeQuadCenter(a)
+      const centerB = Renderer.computeQuadCenter(b)
+      const distA = vec3.distance(cameraPos, centerA)
+      const distB = vec3.distance(cameraPos, centerB)
+      return distB - distA // Sort in descending order (farthest first)
+    })
+    mesh.setDirty({
+      quads: true,
+    })
+  }
+
+
+  public static sortQuadsByDistance(mesh: Mesh, cameraPos: vec3) {
+    const quads: Quad[] = mesh.quads;
+    const n: number = quads.length;
+    if (n < 2) return;
+
+    // 1) Compute negated distances so that ascending sort → descending by real distance
+    const negDistances: Float32Array = new Float32Array(n);
+    for (let i: number = 0; i < n; i++) {
+      const center: vec3 = Renderer.computeQuadCenter(quads[i]);
+      const d: number = vec3.distance(cameraPos, center);
+      negDistances[i] = -d;
+    }
+
+    const {
+      sortedValues: _sortedNegDistances,
+      sortedKeys: sortedQuads,
+    }: {
+      sortedValues: Float32Array;
+      sortedKeys: Quad[];
+    } = radixSortFloat32WithKeys(negDistances, quads);
+
+    mesh.quads = sortedQuads;
+    mesh.setDirty({ quads: true });
+  }
+
+
   protected drawMesh(mesh: Mesh, options: { pos?: boolean, color?: boolean, texture?: boolean, normal?: boolean, blockPos?: boolean, sort?: boolean }) {
     // If the mesh is too large, split it into smaller meshes
     const meshes = mesh.split()
@@ -181,19 +225,7 @@ export class Renderer {
       // the above is to prevent self-occlusion of transparent meshes (Although Minecraft quads, even with stained_glass, does not have such issue)
       for (const m of meshes) {
         // If the mesh is intended for transparent rendering, sort the quads.
-        if (m.quadVertices() > 0) {
-          const cameraPos = this.extractCameraPositionFromView()
-          m.quads.sort((a, b) => {
-            const centerA = Renderer.computeQuadCenter(a)
-            const centerB = Renderer.computeQuadCenter(b)
-            const distA = vec3.distance(cameraPos, centerA)
-            const distB = vec3.distance(cameraPos, centerB)
-            return distB - distA // Sort in descending order (farthest first)
-          })
-          m.setDirty({
-            quads: true,
-          })
-        }
+        Renderer.sortQuadsByDistance(m, this.extractCameraPositionFromView())
       }
     } else {
       this.gl.depthMask(false) // Do draw to depth buffer for opaque meshes
