@@ -45,7 +45,7 @@ export class VoxelRenderer extends Renderer {
 	private quads: Quad[] = []
 	private meshes: Mesh[] = []
 
-	constructor(gl: WebGLRenderingContext) {
+	constructor(gl: WebGL2RenderingContext) {
 		super(gl)
 		this.voxelShaderProgram = new ShaderProgram(gl, vsVoxel, fsVoxel).getProgram()
 	}
@@ -136,10 +136,10 @@ export class VoxelRenderer extends Renderer {
 		return meshes
 	}
 
-	public draw(viewMatrix: mat4) {
+	public draw(viewMatrix: mat4, projMatrix: mat4) {
 		console.debug(`Drawing ${this.meshes.length} meshes...`)
 		this.setShader(this.voxelShaderProgram)
-		this.prepareDraw(viewMatrix)
+		this.prepareDraw(viewMatrix, projMatrix)
 
 		if (this.meshes.length === 0) {
 			this.gl.clearColor(0, 0, 0, 0)

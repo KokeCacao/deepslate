@@ -41,7 +41,7 @@ export class ItemRenderer extends Renderer {
 
 
 	constructor(
-		gl: WebGLRenderingContext,
+		gl: WebGL2RenderingContext,
 		private item: ItemStack,
 		private readonly resources: ItemRendererResources,
 		context: ItemRenderingContext = {},
@@ -79,19 +79,16 @@ export class ItemRenderer extends Renderer {
 
 	}
 
-	protected override getPerspective() {
+	public drawItem() {
+		const viewMatrix = mat4.create()
+		mat4.translate(viewMatrix, viewMatrix, [0, 0, -32])
+
 		const projMatrix = mat4.create()
 		mat4.ortho(projMatrix, 0, 16, 0, 16, 0.1, 500.0)
-		return projMatrix
-	}
-
-	public drawItem() {
-		const view = mat4.create()
-		mat4.translate(view, view, [0, 0, -32])
 
 		this.setShader(this.shaderProgram)
 		this.setTexture(this.atlasTexture, this.resources.getPixelSize?.())
-		this.prepareDraw(view)
+		this.prepareDraw(viewMatrix, projMatrix)
 		this.drawMesh(this.mesh, { pos: true, color: true, texture: true, normal: true })
 	}
 }

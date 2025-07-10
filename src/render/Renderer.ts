@@ -2,7 +2,6 @@ import { mat4, vec3 } from 'gl-matrix'
 import type { Mesh } from './Mesh.js'
 import type { Quad } from './Quad.js'
 import { ShaderProgram } from './ShaderProgram.js'
-
 const vsSource = `
   attribute vec4 vertPos;
   attribute vec2 texCoord;
@@ -21,7 +20,7 @@ const vsSource = `
   void main(void) {
     gl_Position = mProj * mView * vertPos;
     vTexCoord = texCoord;
-    vTexLimit = texLimit;
+  	vTexLimit = texLimit;
     vTintColor = vertColor;
     vLighting = normal.y * 0.2 + abs(normal.z) * 0.1 + 0.8;
   }
@@ -38,11 +37,8 @@ const fsSource = `
   uniform highp float pixelSize;
 
   void main(void) {
-    vec4 texColor = texture2D(sampler, clamp(vTexCoord,
-      vTexLimit.xy + vec2(0.5, 0.5) * pixelSize,
-      vTexLimit.zw - vec2(0.5, 0.5) * pixelSize
-    ));
-    if(texColor.a < 0.01) discard;
+    vec2 clampedCoord = clamp(vTexCoord, vTexLimit.xy, vTexLimit.zw);
+		vec4 texColor = texture2D(sampler, clampedCoord);
     gl_FragColor = vec4(texColor.xyz * vTintColor * vLighting, texColor.a);
   }
 `
@@ -50,30 +46,19 @@ const fsSource = `
 export class Renderer {
   protected readonly shaderProgram: WebGLProgram
   
-  protected projMatrix: mat4
   private activeShader: WebGLProgram
   private pixelSize: number = 0
 
   constructor(
-    protected readonly gl: WebGLRenderingContext
+    protected readonly gl: WebGL2RenderingContext,
   ) {
     this.shaderProgram = new ShaderProgram(gl, vsSource, fsSource).getProgram()
     this.activeShader = this.shaderProgram
-    this.projMatrix = this.getPerspective()
     this.initialize()
   }
 
   public setViewport(x: number, y: number, width: number, height: number) {
     this.gl.viewport(x, y, width, height)
-    this.projMatrix = this.getPerspective()
-  }
-
-  protected getPerspective() {
-    const fieldOfView = 70 * Math.PI / 180
-    const aspect = (this.gl.canvas as HTMLCanvasElement).clientWidth / (this.gl.canvas as HTMLCanvasElement).clientHeight
-    const projMatrix = mat4.create()
-    mat4.perspective(projMatrix, fieldOfView, aspect, 0.1, 500.0)
-    return projMatrix
   }
 
   protected initialize() {
@@ -81,7 +66,12 @@ export class Renderer {
     this.gl.depthFunc(this.gl.LEQUAL)
 
     this.gl.enable(this.gl.BLEND)
-    this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA)
+    this.gl.blendFuncSeparate(
+      this.gl.SRC_ALPHA, // RGB src factor
+      this.gl.ONE_MINUS_SRC_ALPHA, // RGB dst factor
+      this.gl.ONE, // Alpha src factor: take full αf
+      this.gl.ONE_MINUS_SRC_ALPHA // Alpha dst factor
+    );
 
     this.gl.enable(this.gl.CULL_FACE)
     this.gl.cullFace(this.gl.BACK)
@@ -112,17 +102,40 @@ export class Renderer {
   }
 
   protected createAtlasTexture(image: ImageData) {
+    // this.saveAllMipLevels(image, './resources/');
+
     const texture = this.gl.createTexture()!
     this.gl.bindTexture(this.gl.TEXTURE_2D, texture)
+
+    const ext = this.gl.getExtension('EXT_texture_filter_anisotropic')
+    || this.gl.getExtension('MOZ_EXT_texture_filter_anisotropic')
+    || this.gl.getExtension('WEBKIT_EXT_texture_filter_anisotropic');
+    if (ext) {
+      this.gl.texParameterf(
+        this.gl.TEXTURE_2D,
+        ext.TEXTURE_MAX_ANISOTROPY_EXT,
+        4  // try 2, 4, 8, or 16 depending on performance/quality balance
+      );
+    }
+
     this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, image)
-    this.gl.generateMipmap(this.gl.TEXTURE_2D)
+
+    // only sample up to mip level 4 because Minecraft block texture usually 16x16 pixels
+    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_BASE_LEVEL, 0);
+    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAX_LEVEL, 4);
+
+    // linear blend between the two closest mipmap levels, nearest texel in each.
+    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.NEAREST_MIPMAP_LINEAR)
     this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.NEAREST)
+
+    this.gl.generateMipmap(this.gl.TEXTURE_2D)
+
     return texture
   }
 
-  protected prepareDraw(viewMatrix: mat4) {
+  protected prepareDraw(viewMatrix: mat4, projMatrix: mat4) {
     this.setUniform('mView', viewMatrix)
-    this.setUniform('mProj', this.projMatrix)
+    this.setUniform('mProj', projMatrix)
     const location = this.gl.getUniformLocation(this.activeShader, 'pixelSize')    
     this.gl.uniform1f(location, this.pixelSize)
   }
@@ -163,21 +176,27 @@ export class Renderer {
     // If the mesh is too large, split it into smaller meshes
     const meshes = mesh.split()
 
-    for (const m of meshes) {
-      // If the mesh is intended for transparent rendering, sort the quads.
-      if (mesh.quadVertices() > 0 && options.sort) {
-        const cameraPos = this.extractCameraPositionFromView()
-        mesh.quads.sort((a, b) => {
-          const centerA = Renderer.computeQuadCenter(a)
-          const centerB = Renderer.computeQuadCenter(b)
-          const distA = vec3.distance(cameraPos, centerA)
-          const distB = vec3.distance(cameraPos, centerB)
-          return distB - distA // Sort in descending order (farthest first)
-        })
-        mesh.setDirty({
-          quads: true,
-        })
+    if (options.sort) {
+      this.gl.depthMask(true) // Do not draw to depth buffer for transparent meshes
+      // the above is to prevent self-occlusion of transparent meshes (Although Minecraft quads, even with stained_glass, does not have such issue)
+      for (const m of meshes) {
+        // If the mesh is intended for transparent rendering, sort the quads.
+        if (m.quadVertices() > 0) {
+          const cameraPos = this.extractCameraPositionFromView()
+          m.quads.sort((a, b) => {
+            const centerA = Renderer.computeQuadCenter(a)
+            const centerB = Renderer.computeQuadCenter(b)
+            const distA = vec3.distance(cameraPos, centerA)
+            const distB = vec3.distance(cameraPos, centerB)
+            return distB - distA // Sort in descending order (farthest first)
+          })
+          m.setDirty({
+            quads: true,
+          })
+        }
       }
+    } else {
+      this.gl.depthMask(false) // Do draw to depth buffer for opaque meshes
     }
 
     // We rebuild mesh only right before we render to avoid multiple rebuild
@@ -199,7 +218,7 @@ export class Renderer {
     if (mesh.quadVertices() > 0) {
       if (options.pos) this.setVertexAttr('vertPos', 3, mesh.posBuffer)
       if (options.color) this.setVertexAttr('vertColor', 3, mesh.colorBuffer)
-      if (options.texture){
+      if (options.texture) {
         this.setVertexAttr('texCoord', 2, mesh.textureBuffer)
         this.setVertexAttr('texLimit', 4, mesh.textureLimitBuffer)
       }
