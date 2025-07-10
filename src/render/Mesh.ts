@@ -2,7 +2,7 @@ import type { mat4 } from 'gl-matrix'
 import type { Color } from '../index.js'
 import { Vector } from '../index.js'
 import { Line } from './Line.js'
-import type { Quad } from './Quad.js'
+import { Quad } from './Quad.js'
 import { Vertex } from './Vertex.js'
 
 export class Mesh {
@@ -187,18 +187,47 @@ export class Mesh {
 			gl.bufferData(type, data, gl.DYNAMIC_DRAW)
 			return buffer
 		}
-		const rebuildBufferV = (array: Quad[] | Line[], buffer: WebGLBuffer | undefined, mapper: (v: Vertex) => number[] | undefined): WebGLBuffer | undefined => {
-			if (array.length === 0) {
-				if (buffer) gl.deleteBuffer(buffer)
-				return undefined
-			}
-			const data = array.flatMap(e => e.vertices().flatMap(v => {
-				const data = mapper(v)
-				if (!data) throw new Error('Missing vertex component')
-				return data
-			}))
-			return rebuildBuffer(buffer, gl.ARRAY_BUFFER, new Float32Array(data))
-		}
+		
+    const rebuildBufferV = (
+      array: Quad[] | Line[],
+      buffer: WebGLBuffer | undefined,
+      mapper: (v: Vertex) => number[] | undefined
+    ): WebGLBuffer | undefined => {
+      if (array.length === 0) {
+        if (buffer) gl.deleteBuffer(buffer)
+        return undefined
+      }
+
+      let sample: number[] | undefined
+      for (const e of array) {
+        const v = e.vertices()[0]
+        sample = mapper(v)
+        if (sample) break
+      }
+      if (!sample) throw new Error('Mapper returned no data on sample')
+
+      const attribSize = sample.length
+			const totalVerts: number = (array as Array<Quad | Line>).reduce(
+				(sum: number, e: Quad | Line) => sum + e.vertices().length,
+				0
+			)
+      const data = new Float32Array(totalVerts * attribSize)
+
+      let i = 0
+      for (const e of array) {
+        for (const v of e.vertices()) {
+          const values = mapper(v)
+          if (!values || values.length !== attribSize) {
+            throw new Error('Inconsistent vertex attribute size')
+          }
+          for (let j = 0; j < attribSize; j++) {
+            data[i++] = values[j]
+          }
+        }
+      }
+
+      return rebuildBuffer(buffer, gl.ARRAY_BUFFER, data)
+    }
 
 		if (options.pos && this.posBufferDirty) {
 			this.posBuffer = rebuildBufferV(this.quads, this.posBuffer, v => v.pos.components())
