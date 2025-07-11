@@ -59,7 +59,7 @@ export class ChunkBuilder {
   private readonly chunkSize: vec3
 
   constructor(
-    private readonly gl: WebGLRenderingContext,
+    private readonly gl: WebGL2RenderingContext,
     private structure: StructureProvider,
     private readonly resources: Resources,
     chunkSize: number | vec3 = 16
