@@ -65,7 +65,7 @@ export class Renderer {
 
   protected initialize() {
     this.gl.enable(this.gl.DEPTH_TEST)
-    this.gl.depthFunc(this.gl.LEQUAL)
+    this.gl.depthFunc(this.gl.LESS)
 
     this.gl.enable(this.gl.BLEND)
     this.gl.blendFuncSeparate(
