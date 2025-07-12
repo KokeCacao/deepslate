@@ -30,7 +30,7 @@ type ModelMultiPart = {
 }
 
 export interface BlockDefinitionProvider {
-	getBlockDefinition(id: Identifier): BlockDefinition | null
+	getBlockDefinition(id: Identifier): BlockDefinition | undefined
 }
 
 export class BlockDefinition {

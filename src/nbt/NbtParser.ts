@@ -94,7 +94,10 @@ export namespace NbtParser {
 					} else if (value.toLowerCase() === 'false') {
 						return NbtByte.ZERO
 					}
-				} catch (e) { }
+				} catch (e) {
+					reader.cursor = start
+					throw reader.createError(`Invalid number: ${value}`)
+				}
 				return value.length === 0 ? NbtString.EMPTY : new NbtString(value)
 			}
 		}
