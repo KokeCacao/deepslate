@@ -141,8 +141,13 @@ export class ChunkBuilder {
         }
         if (!mesh.isEmpty()) {
           this.finishChunkMesh(mesh, b.pos)
+          var isTransparent = false
           const flags = this.resources.getBlockFlags(blockName)
-          const isTransparent = !!flags?.semi_transparent
+					if (flags?.semi_transparent) {
+						isTransparent = true // Override by user settings
+					} else {
+						isTransparent = !this.resources.getBlockIsNonTransparent(blockName, this.gl)
+					}
           chunk.merge(mesh, isTransparent)
         }
       } catch (e) {
@@ -222,14 +227,22 @@ export class ChunkBuilder {
       BlockPos.towards(block.pos, dir)
     )?.state
     if (!neighbor) return false
-    const neighborFlags = this.resources.getBlockFlags(neighbor.getName())
+		const neighborName = neighbor.getName()
+    const neighborFlags = this.resources.getBlockFlags(neighborName)
 
     if (
-      block.state.getName().equals(neighbor.getName()) &&
+      block.state.getName().equals(neighborName) &&
       neighborFlags?.self_culling
     ) {
       return true
     }
+
+		var isOpaque = false
+		if (neighborFlags?.opaque) {
+			isOpaque = true // Override by user settings
+		} else {
+			isOpaque = this.resources.getBlockIsOpaque(neighborName, this.gl)
+		}
 
     if (neighborFlags?.opaque) {
       return !(dir === Direction.UP && block.state.isWaterlogged())

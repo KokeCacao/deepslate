@@ -65,6 +65,9 @@ export type BlockFlags = {
 }
 
 export interface BlockFlagsProvider {
+	getBlockIsOpaque(id: Identifier, gl: WebGL2RenderingContext): boolean
+	getBlockIsNonTransparent(id: Identifier, gl: WebGL2RenderingContext): boolean
+	getBlockIsCube(id: Identifier): boolean
 	getBlockFlags(id: Identifier): BlockFlags | null
 }
 

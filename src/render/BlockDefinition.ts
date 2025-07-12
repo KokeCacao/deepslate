@@ -39,6 +39,26 @@ export class BlockDefinition {
 		private readonly multipart: ModelMultiPart[] | undefined,
 	) {}
 
+	public getAllModelIds(): Identifier[] {
+		if (this.variants) {
+			return Object.values(this.variants).flatMap(v => {
+				if (Array.isArray(v)) {
+					return v.map(m => Identifier.parse(m.model))
+				}
+				return [Identifier.parse(v.model)]
+			})
+		} else if (this.multipart) {
+			return this.multipart.flatMap(p => {
+				const apply = p.apply
+				if (Array.isArray(apply)) {
+					return apply.map(a => Identifier.parse(a.model))
+				}
+				return [Identifier.parse(apply.model)]
+			})
+		}
+		return []
+	}
+
 	public getModelVariants(props: { [key: string]: string }): ModelVariant[] {
 		if (this.variants) {
 			const matches = Object.keys(this.variants).filter(v => this.matchesVariant(v, props))

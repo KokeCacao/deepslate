@@ -75,6 +75,7 @@ export class BlockModel {
 	private static readonly BUILTIN_GENERATED = Identifier.create('builtin/generated')
 	private static readonly GENERATED_LAYERS = ['layer0', 'layer1', 'layer2', 'layer3', 'layer4']
 	private generationMarker = false
+	private originalParent: Identifier | undefined
 
 	constructor(
 		private parent: Identifier | undefined,
@@ -83,7 +84,9 @@ export class BlockModel {
 		private display?: BlockModelDisplay | undefined,
 		private guiLight?: BlockModelGuiLight | undefined,
 		private uvLock?: boolean | undefined,
-	) {}
+	) {
+		this.originalParent = parent
+	}
 
 	public getDisplayTransform(display: Display) {
 		const transform = this.display?.[display]
@@ -102,6 +105,17 @@ export class BlockModel {
 		}
 		mat4.translate(t, t, [-8, -8, -8])
 		return t
+	}
+
+	public isCube() {
+		if (this.originalParent === undefined) {
+			return false;
+		}
+		if (this.originalParent.toString().startsWith('minecraft:block/cube')) {
+			return true;
+		}
+		// TODO: maybe add check for non-minecraft namespaced models?
+		return false;
 	}
 
 	public getMesh(atlas: TextureAtlasProvider, cull: Cull, variant: ModelVariant | undefined, tint?: Color | ((index: number) => Color)) {
@@ -204,6 +218,14 @@ export class BlockModel {
 			mat4.translate(t, t, origin)
 		}
 		return mesh.transform(t)
+	}
+
+	public getAllTextureIds(): Identifier[] {
+		if (!this.textures) {
+			return []
+		}
+		// TODO: should probably filter out all block unrelated textures like "particle"
+		return Object.values(this.textures).map(t => Identifier.parse(t))
 	}
 
 	private getTexture(textureRef: string) {
