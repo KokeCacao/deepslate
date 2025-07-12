@@ -83,7 +83,6 @@ export class BlockModel {
 		private elements: BlockModelElement[] | undefined,
 		private display?: BlockModelDisplay | undefined,
 		private guiLight?: BlockModelGuiLight | undefined,
-		private uvLock?: boolean | undefined,
 	) {
 		this.originalParent = parent
 	}
