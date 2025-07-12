@@ -118,23 +118,31 @@ export class ChunkBuilder {
 
       try {
         const blockDefinition = this.resources.getBlockDefinition(blockName)
-        const cull = {
-          up: this.needsCull(b, Direction.UP),
-          down: this.needsCull(b, Direction.DOWN),
-          west: this.needsCull(b, Direction.WEST),
-          east: this.needsCull(b, Direction.EAST),
-          north: this.needsCull(b, Direction.NORTH),
-          south: this.needsCull(b, Direction.SOUTH),
+        const cullBlock = {
+          up: this.needsCullBlock(b, Direction.UP),
+          down: this.needsCullBlock(b, Direction.DOWN),
+          west: this.needsCullBlock(b, Direction.WEST),
+          east: this.needsCullBlock(b, Direction.EAST),
+          north: this.needsCullBlock(b, Direction.NORTH),
+          south: this.needsCullBlock(b, Direction.SOUTH),
+        }
+        const cullWater = {
+          up: this.needsCullWater(b, Direction.UP),
+          down: this.needsCullWater(b, Direction.DOWN),
+          west: this.needsCullWater(b, Direction.WEST),
+          east: this.needsCullWater(b, Direction.EAST),
+          north: this.needsCullWater(b, Direction.NORTH),
+          south: this.needsCullWater(b, Direction.SOUTH),
         }
         const mesh = new Mesh()
         if (blockDefinition) {
           mesh.merge(blockDefinition.getMesh(
             blockName, blockProps,
-            this.resources, this.resources, cull
+            this.resources, this.resources, cullBlock
           ))
         }
         const specialMesh = SpecialRenderers.getBlockMesh(
-          b.state, b.nbt, this.resources, cull
+          b.state, b.nbt, this.resources, cullWater,
         )
         if (!specialMesh.isEmpty()) {
           mesh.merge(specialMesh)
@@ -152,6 +160,7 @@ export class ChunkBuilder {
         }
       } catch (e) {
         console.error(`Error rendering block ${blockName}`, e)
+				throw e
       }
     }
   }
@@ -222,35 +231,87 @@ export class ChunkBuilder {
     )
   }
 
-  private needsCull(block: PlacedBlock, dir: Direction) {
+  private needsCullBlock(block: PlacedBlock, dir: Direction) {
     const neighbor = this.structure.getBlock(
       BlockPos.towards(block.pos, dir)
     )?.state
-    if (!neighbor) return false
+    const usName = block.state.getName()
+
+    // If no neighbor, no cull needed
+    if (!neighbor || neighbor.isAir()) return false
+
 		const neighborName = neighbor.getName()
     const neighborFlags = this.resources.getBlockFlags(neighborName)
+		var neighborIsOpaque = false
+		if (neighborFlags?.opaque) {
+			neighborIsOpaque = true // Override by user settings
+		} else {
+			neighborIsOpaque = this.resources.getBlockIsOpaque(neighborName, this.gl)
+		}
+    const weAreCube = this.resources.getBlockIsCube(usName)
 
+    // If we are the same block, apply self-culling if we are cube
     if (
+      weAreCube &&
       block.state.getName().equals(neighborName) &&
       neighborFlags?.self_culling
     ) {
       return true
     }
 
-		var isOpaque = false
-		if (neighborFlags?.opaque) {
-			isOpaque = true // Override by user settings
-		} else {
-			isOpaque = this.resources.getBlockIsOpaque(neighborName, this.gl)
-		}
-
-    if (neighborFlags?.opaque) {
-      return !(dir === Direction.UP && block.state.isWaterlogged())
-    } else {
-      return (
-        block.state.isWaterlogged() && neighbor.isWaterlogged()
-      )
+    // If neighbor is opaque, cull if we are a cube
+    if (neighborIsOpaque && weAreCube) {
+      return true
     }
+
+    // Otherwise, don't cull
+    return false
+  }
+
+  private needsCullWater(block: PlacedBlock, dir: Direction) {
+    const neighbor = this.structure.getBlock(
+      BlockPos.towards(block.pos, dir)
+    )?.state
+    const usName = block.state.getName()
+
+    // If no neighbor, no cull needed
+    if (!neighbor || neighbor.isAir()) return false
+
+		const neighborName = neighbor.getName()
+    const neighborFlags = this.resources.getBlockFlags(neighborName)
+		var neighborIsOpaque = false
+		if (neighborFlags?.opaque) {
+			neighborIsOpaque = true // Override by user settings
+		} else {
+			neighborIsOpaque = this.resources.getBlockIsOpaque(neighborName, this.gl)
+		}
+    const weAreWaterLogged = block.state.isWaterlogged()
+    const neighborIsWaterLogged = neighbor.isWaterlogged()
+
+    // If both blocks are waterlogged, do cull
+    if (weAreWaterLogged && neighborIsWaterLogged) {
+      return true
+    }
+
+    // If we are waterlogged, and neighbor is not opaque, do not cull
+    if (weAreWaterLogged && !neighborIsOpaque) {
+      return false
+    }
+
+    // If we are waterlogged, and neighbor is opaque, but is a up neighbor, do not cull
+    if (weAreWaterLogged && neighborIsOpaque && dir === Direction.UP) {
+      return false
+    }
+
+    // If we are waterlogged, and neighbor is opaque, but is not a up neighbor, do cull
+    if (weAreWaterLogged && neighborIsOpaque && dir !== Direction.UP) {
+      return true
+    }
+
+    if (weAreWaterLogged) {
+      throw new Error(`This line should not be reached`)
+    }
+    return true // We don't have water anyway
   }
 
   private finishChunkMesh(mesh: Mesh, pos: vec3) {
