@@ -75,7 +75,6 @@ export class BlockModel {
 	private static readonly BUILTIN_GENERATED = Identifier.create('builtin/generated')
 	private static readonly GENERATED_LAYERS = ['layer0', 'layer1', 'layer2', 'layer3', 'layer4']
 	private generationMarker = false
-	private originalParent: Identifier | undefined
 
 	constructor(
 		private parent: Identifier | undefined,
@@ -83,9 +82,7 @@ export class BlockModel {
 		private elements: BlockModelElement[] | undefined,
 		private display?: BlockModelDisplay | undefined,
 		private guiLight?: BlockModelGuiLight | undefined,
-	) {
-		this.originalParent = parent
-	}
+	) {}
 
 	public getDisplayTransform(display: Display) {
 		const transform = this.display?.[display]
@@ -107,13 +104,12 @@ export class BlockModel {
 	}
 
 	public isCube() {
-		if (this.originalParent === undefined) {
-			return false;
-		}
-		if (this.originalParent.toString().startsWith('minecraft:block/cube')) {
-			return true;
-		}
-		// TODO: maybe add check for non-minecraft namespaced models?
+    for (const elements of this.elements ?? []) {
+      if (elements.from[0] <= 0.01 && elements.from[1] <= 0.01 && elements.from[2] <= 0.01 &&
+          elements.to[0] >= 15.99 && elements.to[1] >= 15.99 && elements.to[2] >= 15.99) {
+        return true;
+      }
+    }
 		return false;
 	}
 
