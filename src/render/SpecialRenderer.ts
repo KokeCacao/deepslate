@@ -12,7 +12,7 @@ import { Mesh } from './Mesh.js'
 import type { TextureAtlasProvider, UV } from './TextureAtlas.js'
 
 function liquidRenderer(type: string, level: number, atlas: TextureAtlasProvider, cull: CullWater, tintindex?: number) {
-
+  const zFightingThreshold = 0.001
 	const y = cull.up !== undefined ? 16 : [14.2, 12.5, 10.5, 9, 7, 5.3, 3.7, 1.9, 16, 16, 16, 16, 16, 16, 16, 16][level]
 	const blockModel = new BlockModel(undefined, {
 		still: `block/${type}_still`,
@@ -35,49 +35,49 @@ function liquidRenderer(type: string, level: number, atlas: TextureAtlasProvider
     switch (direction) {
       case Direction.DOWN:
         if (cull.down === undefined) {
-          pos[1] = pos[1] - 0.001
-          pos[4] = pos[4] - 0.001
-          pos[7] = pos[7] - 0.001
-          pos[10] = pos[10] - 0.001
+          pos[1] = pos[1] + zFightingThreshold
+          pos[4] = pos[4] + zFightingThreshold
+          pos[7] = pos[7] + zFightingThreshold
+          pos[10] = pos[10] + zFightingThreshold
         }
       case Direction.SOUTH:
         if (cull.south !== undefined) {
           neighborLevel = [14.2, 12.5, 10.5, 9, 7, 5.3, 3.7, 1.9, 16, 16, 16, 16, 16, 16, 16, 16][cull.south]
         } else {
-          pos[2] = pos[2] - 0.001
-          pos[5] = pos[5] - 0.001
-          pos[8] = pos[8] - 0.001
-          pos[11] = pos[11] - 0.001
+          pos[2] = pos[2] - zFightingThreshold
+          pos[5] = pos[5] - zFightingThreshold
+          pos[8] = pos[8] - zFightingThreshold
+          pos[11] = pos[11] - zFightingThreshold
         }
         break;
       case Direction.NORTH:
         if (cull.north !== undefined) {
           neighborLevel = [14.2, 12.5, 10.5, 9, 7, 5.3, 3.7, 1.9, 16, 16, 16, 16, 16, 16, 16, 16][cull.north]
         } else {
-          pos[2] = pos[2] + 0.001
-          pos[5] = pos[5] + 0.001
-          pos[8] = pos[8] + 0.001
-          pos[11] = pos[11] + 0.001
+          pos[2] = pos[2] + zFightingThreshold
+          pos[5] = pos[5] + zFightingThreshold
+          pos[8] = pos[8] + zFightingThreshold
+          pos[11] = pos[11] + zFightingThreshold
         }
         break;
       case Direction.EAST:
         if (cull.east !== undefined) {
           neighborLevel = [14.2, 12.5, 10.5, 9, 7, 5.3, 3.7, 1.9, 16, 16, 16, 16, 16, 16, 16, 16][cull.east]
         } else {
-          pos[0] = pos[0] - 0.001
-          pos[3] = pos[3] - 0.001
-          pos[6] = pos[6] - 0.001
-          pos[9] = pos[9] - 0.001
+          pos[0] = pos[0] - zFightingThreshold
+          pos[3] = pos[3] - zFightingThreshold
+          pos[6] = pos[6] - zFightingThreshold
+          pos[9] = pos[9] - zFightingThreshold
         }
         break;
       case Direction.WEST:
         if (cull.west !== undefined) {
           neighborLevel = [14.2, 12.5, 10.5, 9, 7, 5.3, 3.7, 1.9, 16, 16, 16, 16, 16, 16, 16, 16][cull.west]
         } else {
-          pos[0] = pos[0] + 0.001
-          pos[3] = pos[3] + 0.001
-          pos[6] = pos[6] + 0.001
-          pos[9] = pos[9] + 0.001
+          pos[0] = pos[0] + zFightingThreshold
+          pos[3] = pos[3] + zFightingThreshold
+          pos[6] = pos[6] + zFightingThreshold
+          pos[9] = pos[9] + zFightingThreshold
         }
         break;
       default:
