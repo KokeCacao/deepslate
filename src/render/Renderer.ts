@@ -41,6 +41,7 @@ const fsSource = `
   void main(void) {
     vec2 clampedCoord = clamp(vTexCoord, vTexLimit.xy, vTexLimit.zw);
 		vec4 texColor = texture2D(sampler, clampedCoord);
+    if (texColor.a == 0.0) discard;
     gl_FragColor = vec4(texColor.xyz * vTintColor * vLighting, texColor.a);
   }
 `
@@ -221,14 +222,20 @@ export class Renderer {
     const meshes = mesh.split()
 
     if (options.sort) {
-      this.gl.depthMask(true) // Do not draw to depth buffer for transparent meshes
-      // the above is to prevent self-occlusion of transparent meshes (Although Minecraft quads, even with stained_glass, does not have such issue)
+      // this.gl.depthMask(false) // Do not draw to depth buffer for transparent meshes
+      // Note that our "sort" is applied for "transparent" meshes like minecraft:repeater as well
+      // Normally, setting depthMask(false) will prevent self-intersection of transparent meshes (stained_glass),
+      // but "minecraft:repeater" is opaque fragment in LOD0, transparent in LOD4
+      // So repeater will not render correctly with depthMask(false)
+      // On the other hand, "minecraft:stained_glass" might theriotically have issue
+      // but is not observed in practice (maybe due to its thickness) when if (texColor.a == 0.0) discard;
+
       for (const m of meshes) {
         // If the mesh is intended for transparent rendering, sort the quads.
         Renderer.sortQuadsByDistance(m, this.extractCameraPositionFromView())
       }
     } else {
-      this.gl.depthMask(false) // Do draw to depth buffer for opaque meshes
+      // this.gl.depthMask(true) // Do draw to depth buffer for opaque meshes
     }
 
     // We rebuild mesh only right before we render to avoid multiple rebuild
@@ -244,6 +251,7 @@ export class Renderer {
     for (const m of meshes) {
       this.drawMeshInner(m, options)
     }
+    // this.gl.depthMask(true) // Reset depth mask to true after drawing
   }
 
   protected drawMeshInner(mesh: Mesh, options: { pos?: boolean, color?: boolean, texture?: boolean, normal?: boolean, blockPos?: boolean, sort?: boolean }) {
