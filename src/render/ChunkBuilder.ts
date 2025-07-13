@@ -135,29 +135,32 @@ export class ChunkBuilder {
           north: this.needsCullWater(b, Direction.NORTH),
           south: this.needsCullWater(b, Direction.SOUTH),
         }
-        const mesh = new Mesh()
         if (blockDefinition) {
-          mesh.merge(blockDefinition.getMesh(
+          const mesh = blockDefinition.getMesh(
             blockName, blockProps,
             this.resources, this.resources, cullBlock
-          ))
+          )
+          if (!mesh.isEmpty()) {
+            this.finishChunkMesh(mesh, b.pos)
+            var isTransparent = false
+            const flags = this.resources.getBlockFlags(blockName)
+            if (flags?.semi_transparent) {
+              isTransparent = true // Override by user settings
+            } else {
+              isTransparent = !this.resources.getBlockIsNonTransparent(blockName, this.gl)
+            }
+            chunk.merge(mesh, isTransparent)
+          }
         }
         const specialMesh = SpecialRenderers.getBlockMesh(
           b.state, b.nbt, this.resources, cullWater,
         )
         if (!specialMesh.isEmpty()) {
-          mesh.merge(specialMesh)
-        }
-        if (!mesh.isEmpty()) {
-          this.finishChunkMesh(mesh, b.pos)
-          var isTransparent = false
-          const flags = this.resources.getBlockFlags(blockName)
-					if (flags?.semi_transparent) {
-						isTransparent = true // Override by user settings
-					} else {
-						isTransparent = !this.resources.getBlockIsNonTransparent(blockName, this.gl)
-					}
-          chunk.merge(mesh, isTransparent)
+          this.finishChunkMesh(specialMesh, b.pos)
+          // Assume special meshes are always transparent
+          // which is fine if depthMask(false) is not used
+          // This ensure waterlogged blocks are rendered correctly
+          chunk.merge(specialMesh, true) 
         }
       } catch (e) {
         console.error(`Error rendering block ${blockName}`, e)
