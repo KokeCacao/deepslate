@@ -1,6 +1,7 @@
 import type { Direction } from '../core/index.js'
 
 export type Cull = {[key in Direction]?: boolean}
+export type CullWater = {[key in Direction]?: number}
 
 export namespace Cull {
 	export function rotate(cull: Cull, x: number, y: number) {

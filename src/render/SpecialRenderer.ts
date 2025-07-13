@@ -6,18 +6,19 @@ import { NbtType } from '../nbt/index.js'
 import { Color } from '../util/index.js'
 import { BlockColors } from './BlockColors.js'
 import { BlockModel } from './BlockModel.js'
+import type { CullWater } from './Cull.js'
 import { Cull } from './Cull.js'
 import { Mesh } from './Mesh.js'
-import type { TextureAtlasProvider } from './TextureAtlas.js'
+import type { TextureAtlasProvider, UV } from './TextureAtlas.js'
 
-function liquidRenderer(type: string, level: number, atlas: TextureAtlasProvider, cull: Cull, tintindex?: number) {
+function liquidRenderer(type: string, level: number, atlas: TextureAtlasProvider, cull: CullWater, tintindex?: number) {
   const transformation = mat4.create()
   mat4.translate(transformation, transformation, [8, 8, 8])
   mat4.scale(transformation, transformation, [0.999, 0.999, 0.999])
   mat4.translate(transformation, transformation, [-8, -8, -8])
 
 	const y = cull['up'] ? 16 : [14.2, 12.5, 10.5, 9, 7, 5.3, 3.7, 1.9, 16, 16, 16, 16, 16, 16, 16, 16][level]
-	return new BlockModel(undefined, {
+	const blockModel = new BlockModel(undefined, {
 		still: `block/${type}_still`,
 		flow: `block/${type}_flow`,
 	}, [{
@@ -31,7 +32,40 @@ function liquidRenderer(type: string, level: number, atlas: TextureAtlasProvider
 			south: { texture: '#flow', tintindex, cullface: Direction.SOUTH },
 			west: { texture: '#flow', tintindex, cullface: Direction.WEST },
 		},
-	}]).getMesh(atlas, cull, undefined, BlockColors[type]?.({})).transform(transformation)
+	}])
+  
+  const textureModifier= (uv: UV, pos: number[], direction: Direction | undefined) => {
+    var neighborLevel = 0
+    switch (direction) {
+      case Direction.SOUTH:
+        if (cull.south !== undefined) {
+          neighborLevel = [14.2, 12.5, 10.5, 9, 7, 5.3, 3.7, 1.9, 16, 16, 16, 16, 16, 16, 16, 16][cull.south]
+        }
+        break;
+      case Direction.NORTH:
+        if (cull.north !== undefined) {
+          neighborLevel = [14.2, 12.5, 10.5, 9, 7, 5.3, 3.7, 1.9, 16, 16, 16, 16, 16, 16, 16, 16][cull.north]
+        }
+        break;
+      case Direction.EAST:
+        if (cull.east !== undefined) {
+          neighborLevel = [14.2, 12.5, 10.5, 9, 7, 5.3, 3.7, 1.9, 16, 16, 16, 16, 16, 16, 16, 16][cull.east]
+        }
+        break;
+      case Direction.WEST:
+        if (cull.west !== undefined) {
+          neighborLevel = [14.2, 12.5, 10.5, 9, 7, 5.3, 3.7, 1.9, 16, 16, 16, 16, 16, 16, 16, 16][cull.west]
+        }
+        break;
+      default:
+        break;
+    }
+    uv[3] = Math.max(uv[3] - neighborLevel, 0)
+    pos[1] = Math.max(pos[1] + neighborLevel, 0)
+    pos[4] = Math.max(pos[4] + neighborLevel, 0)
+  }
+
+  return blockModel.getMesh(atlas, Cull.none(), undefined, BlockColors[type]?.({}), textureModifier).transform(transformation)
 }
 
 const DyeColors: Record<string, Color> = {
@@ -911,7 +945,7 @@ export namespace SpecialRenderers {
 		)
 	)
 
-	export function getBlockMesh(block: BlockState, nbt: NbtCompound | undefined, atlas: TextureAtlasProvider, cull: Cull): Mesh {
+	export function getBlockMesh(block: BlockState, nbt: NbtCompound | undefined, atlas: TextureAtlasProvider, cull: CullWater): Mesh {
 		const mesh = new Mesh()
 		if (block.is('water')) {
 			mesh.merge(liquidRenderer('water', getInt(block, 'level'), atlas, cull, 0))

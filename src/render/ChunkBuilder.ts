@@ -2,6 +2,7 @@ import { mat4, vec3 } from 'gl-matrix'
 import type { PlacedBlock, Resources, StructureProvider } from '../index.js'
 import { BlockPos, Direction, Vector } from '../index.js'
 import { radixSortFloat32WithKeys } from '../util/Sort.js'
+import type { Cull, CullWater } from './Cull.js'
 import { Mesh } from './Mesh.js'
 import { SpecialRenderers } from './SpecialRenderer.js'
 
@@ -118,7 +119,7 @@ export class ChunkBuilder {
 
       try {
         const blockDefinition = this.resources.getBlockDefinition(blockName)
-        const cullBlock = {
+        const cullBlock: Cull = {
           up: this.needsCullBlock(b, Direction.UP),
           down: this.needsCullBlock(b, Direction.DOWN),
           west: this.needsCullBlock(b, Direction.WEST),
@@ -126,7 +127,7 @@ export class ChunkBuilder {
           north: this.needsCullBlock(b, Direction.NORTH),
           south: this.needsCullBlock(b, Direction.SOUTH),
         }
-        const cullWater = {
+        const cullWater: CullWater = {
           up: this.needsCullWater(b, Direction.UP),
           down: this.needsCullWater(b, Direction.DOWN),
           west: this.needsCullWater(b, Direction.WEST),
@@ -268,14 +269,14 @@ export class ChunkBuilder {
     return false
   }
 
-  private needsCullWater(block: PlacedBlock, dir: Direction) {
+  private needsCullWater(block: PlacedBlock, dir: Direction): number | undefined {
     const neighbor = this.structure.getBlock(
       BlockPos.towards(block.pos, dir)
     )?.state
-    const usName = block.state.getName()
 
     // If no neighbor, no cull needed
-    if (!neighbor || neighbor.isAir()) return false
+    if (!neighbor || neighbor.isAir()) return undefined
+    const neighborLevel = parseInt(neighbor.getProperty('level') ?? '0')
 
 		const neighborName = neighbor.getName()
     const neighborFlags = this.resources.getBlockFlags(neighborName)
@@ -290,28 +291,28 @@ export class ChunkBuilder {
 
     // If both blocks are waterlogged, do cull
     if (weAreWaterLogged && neighborIsWaterLogged) {
-      return true
+      return neighborLevel
     }
 
     // If we are waterlogged, and neighbor is not opaque, do not cull
     if (weAreWaterLogged && !neighborIsOpaque) {
-      return false
+      return undefined
     }
 
     // If we are waterlogged, and neighbor is opaque, but is a up neighbor, do not cull
     if (weAreWaterLogged && neighborIsOpaque && dir === Direction.UP) {
-      return false
+      return undefined
     }
 
     // If we are waterlogged, and neighbor is opaque, but is not a up neighbor, do cull
     if (weAreWaterLogged && neighborIsOpaque && dir !== Direction.UP) {
-      return true
+      return neighborLevel
     }
 
     if (weAreWaterLogged) {
       throw new Error(`This line should not be reached`)
     }
-    return true // We don't have water anyway
+    return neighborLevel // We don't have water anyway
   }
 
   private finishChunkMesh(mesh: Mesh, pos: vec3) {

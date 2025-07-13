@@ -113,7 +113,7 @@ export class BlockModel {
 		return false;
 	}
 
-	public getMesh(atlas: TextureAtlasProvider, cull: Cull, variant: ModelVariant | undefined, tint?: Color | ((index: number) => Color)) {
+	public getMesh(atlas: TextureAtlasProvider, cull: Cull, variant: ModelVariant | undefined, tint?: Color | ((index: number) => Color), textureModifier?: undefined | ((uv: UV, pos: number[], direction: Direction | undefined) => void)) {
 		const mesh = new Mesh()
 		const getTint = (index?: number): Color => {
 			if (tint === undefined) return [1, 1, 1]
@@ -122,12 +122,53 @@ export class BlockModel {
 			return tint
 		}
 		for (const e of this.elements ?? []) {
-			mesh.merge(this.getElementMesh(e, atlas, cull, variant, getTint))
+			mesh.merge(this.getElementMesh(e, atlas, cull, variant, getTint, textureModifier))
 		}
 		return mesh
 	}
 
-	public getElementMesh(e: BlockModelElement, atlas: TextureAtlasProvider, cull: Cull, variant: ModelVariant | undefined, getTint: (index?: number) => Color) {
+  private addFace(mesh: Mesh, atlas: TextureAtlasProvider, getTint: (index?: number) => Color, face: BlockModelFace, uv: UV, pos: number[], additionalRotate: number, textureModifier?: undefined | ((uv: UV, pos: number[], direction: Direction | undefined) => void)) {
+    if (textureModifier) {
+      textureModifier(uv, pos, face.cullface)
+    }
+
+    const quad = Quad.fromPoints(
+      new Vector(pos[0], pos[1], pos[2]),
+      new Vector(pos[3], pos[4], pos[5]),
+      new Vector(pos[6], pos[7], pos[8]),
+      new Vector(pos[9], pos[10], pos[11]))
+
+    const tint = getTint(face.tintindex)
+    quad.setColor(tint)
+
+    const [u0, v0, u1, v1] = atlas.getTextureUV(this.getTexture(face.texture))
+    const du = (u1 - u0) / 16
+    const dv = (v1 - v0) / 16
+    const duu = atlas.getPixelSize() * 0.5
+    const dvv = atlas.getPixelSize() * 0.5
+    uv[0] = (face.uv?.[0] ?? uv[0]) * du
+    uv[1] = (face.uv?.[1] ?? uv[1]) * dv
+    uv[2] = (face.uv?.[2] ?? uv[2]) * du
+    uv[3] = (face.uv?.[3] ?? uv[3]) * dv
+    const newRotation = (
+      (( (face.rotation ?? 0) + additionalRotate ) % 360 + 360) % 360
+    ) as 0 | 90 | 180 | 270;
+    const r = faceRotations[newRotation]
+    quad.setTexture([
+      u0 + uv[r[0]], v0 + uv[r[1]],
+      u0 + uv[r[2]], v0 + uv[r[3]],
+      u0 + uv[r[4]], v0 + uv[r[5]],
+      u0 + uv[r[6]], v0 + uv[r[7]],
+    ], [
+      u0 + Math.min(uv[0], uv[2]) + duu,
+      v0 + Math.min(uv[1], uv[3]) + dvv,
+      u0 + Math.max(uv[0], uv[2]) - duu,
+      v0 + Math.max(uv[1], uv[3]) - dvv,
+    ])
+    mesh.quads.push(quad)
+  }
+
+	public getElementMesh(e: BlockModelElement, atlas: TextureAtlasProvider, cull: Cull, variant: ModelVariant | undefined, getTint: (index?: number) => Color, textureModifier?: undefined | ((uv: UV, pos: number[], direction: Direction | undefined) => void)) {
 		const mesh = new Mesh()
 		const [x0, y0, z0] = e.from
 		const [x1, y1, z1] = e.to
@@ -139,66 +180,29 @@ export class BlockModel {
 				y: 0,
 		}
 
-		const addFace = (face: BlockModelFace, uv: UV, pos: number[], additionalRotate: number) => {
-			const quad = Quad.fromPoints(
-				new Vector(pos[0], pos[1], pos[2]),
-				new Vector(pos[3], pos[4], pos[5]),
-				new Vector(pos[6], pos[7], pos[8]),
-				new Vector(pos[9], pos[10], pos[11]))
-
-			const tint = getTint(face.tintindex)
-			quad.setColor(tint)
-
-			const [u0, v0, u1, v1] = atlas.getTextureUV(this.getTexture(face.texture))
-			const du = (u1 - u0) / 16
-			const dv = (v1 - v0) / 16
-			const duu = atlas.getPixelSize() * 0.5
-			const dvv = atlas.getPixelSize() * 0.5
-			uv[0] = (face.uv?.[0] ?? uv[0]) * du
-			uv[1] = (face.uv?.[1] ?? uv[1]) * dv
-			uv[2] = (face.uv?.[2] ?? uv[2]) * du
-			uv[3] = (face.uv?.[3] ?? uv[3]) * dv
-			const newRotation = (
-				(( (face.rotation ?? 0) + additionalRotate ) % 360 + 360) % 360
-			) as 0 | 90 | 180 | 270;
-			const r = faceRotations[newRotation]
-			quad.setTexture([
-				u0 + uv[r[0]], v0 + uv[r[1]],
-				u0 + uv[r[2]], v0 + uv[r[3]],
-				u0 + uv[r[4]], v0 + uv[r[5]],
-				u0 + uv[r[6]], v0 + uv[r[7]],
-			], [
-				u0 + Math.min(uv[0], uv[2]) + duu,
-				v0 + Math.min(uv[1], uv[3]) + dvv,
-				u0 + Math.max(uv[0], uv[2]) - duu,
-				v0 + Math.max(uv[1], uv[3]) - dvv,
-			])
-			mesh.quads.push(quad)
-		}
-	
 		if (e.faces?.up?.texture && (!e.faces.up.cullface || !cull[e.faces.up.cullface])) {
-			addFace(e.faces.up, [x0, 16 - z1, x1, 16 - z0],
-				[x0, y1, z1,  x1, y1, z1,  x1, y1, z0,  x0, y1, z0], variant.uvlock ? -(variant.y ?? 0) : 0)
+			this.addFace(mesh, atlas, getTint, e.faces.up, [x0, 16 - z1, x1, 16 - z0],
+				[x0, y1, z1,  x1, y1, z1,  x1, y1, z0,  x0, y1, z0], variant.uvlock ? -(variant.y ?? 0) : 0, textureModifier)
 		}
 		if (e.faces?.down?.texture && (!e.faces.down.cullface || !cull[e.faces.down.cullface])) {
-			addFace(e.faces.down, [16 - z1, 16 - x1, 16 - z0, 16 - x0],
-				[x0, y0, z0,  x1, y0, z0,  x1, y0, z1,  x0, y0, z1], variant.uvlock ? -(variant.y ?? 0) : 0)
+			this.addFace(mesh, atlas, getTint, e.faces.down, [16 - z1, 16 - x1, 16 - z0, 16 - x0],
+				[x0, y0, z0,  x1, y0, z0,  x1, y0, z1,  x0, y0, z1], variant.uvlock ? -(variant.y ?? 0) : 0, textureModifier)
 		}
 		if (e.faces?.south?.texture && (!e.faces.south.cullface || !cull[e.faces.south.cullface])) {
-			addFace(e.faces.south, [x0, 16 - y1, x1, 16 - y0], 
-				[x0, y0, z1,  x1, y0, z1,  x1, y1, z1,  x0, y1, z1], 0)
+			this.addFace(mesh, atlas, getTint, e.faces.south, [x0, 16 - y1, x1, 16 - y0], 
+				[x0, y0, z1,  x1, y0, z1,  x1, y1, z1,  x0, y1, z1], 0, textureModifier)
 		}
 		if (e.faces?.north?.texture && (!e.faces.north.cullface || !cull[e.faces.north.cullface])) {
-			addFace(e.faces.north, [16 - x1, 16 - y1, 16 - x0, 16 - y0], 
-				[x1, y0, z0,  x0, y0, z0,  x0, y1, z0,  x1, y1, z0], 0)
+			this.addFace(mesh, atlas, getTint, e.faces.north, [16 - x1, 16 - y1, 16 - x0, 16 - y0], 
+				[x1, y0, z0,  x0, y0, z0,  x0, y1, z0,  x1, y1, z0], 0, textureModifier)
 		}
 		if (e.faces?.east?.texture && (!e.faces.east.cullface || !cull[e.faces.east.cullface])) {
-			addFace(e.faces.east, [16 - z1, 16 - y1, 16 - z0, 16 - y0], 
-				[x1, y0, z1,  x1, y0, z0,  x1, y1, z0,  x1, y1, z1], variant.uvlock ? -(variant.x ?? 0) : 0)
+			this.addFace(mesh, atlas, getTint, e.faces.east, [16 - z1, 16 - y1, 16 - z0, 16 - y0], 
+				[x1, y0, z1,  x1, y0, z0,  x1, y1, z0,  x1, y1, z1], variant.uvlock ? -(variant.x ?? 0) : 0, textureModifier)
 		}
 		if (e.faces?.west?.texture && (!e.faces.west.cullface || !cull[e.faces.west.cullface])) {
-			addFace(e.faces.west, [z0, 16 - y1, z1, 16 - y0], 
-				[x0, y0, z0,  x0, y0, z1,  x0, y1, z1,  x0, y1, z0], variant.uvlock ? -(variant.x ?? 0) : 0)
+			this.addFace(mesh, atlas, getTint, e.faces.west, [z0, 16 - y1, z1, 16 - y0], 
+				[x0, y0, z0,  x0, y0, z1,  x0, y1, z1,  x0, y1, z0], variant.uvlock ? -(variant.x ?? 0) : 0, textureModifier)
 		}
 	
 		const t = mat4.create()
