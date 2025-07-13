@@ -42,7 +42,7 @@ function liquidRenderer(type: string, level: number, atlas: TextureAtlasProvider
         }
       case Direction.SOUTH:
         if (cull.south !== undefined) {
-          neighborLevel = [14.2, 12.5, 10.5, 9, 7, 5.3, 3.7, 1.9, 16, 16, 16, 16, 16, 16, 16, 16][cull.south]
+          neighborLevel = level > cull.south ? [14.2, 12.5, 10.5, 9, 7, 5.3, 3.7, 1.9, 16, 16, 16, 16, 16, 16, 16, 16][cull.south] : 0
         } else {
           pos[2] = pos[2] - zFightingThreshold
           pos[5] = pos[5] - zFightingThreshold
@@ -52,7 +52,7 @@ function liquidRenderer(type: string, level: number, atlas: TextureAtlasProvider
         break;
       case Direction.NORTH:
         if (cull.north !== undefined) {
-          neighborLevel = [14.2, 12.5, 10.5, 9, 7, 5.3, 3.7, 1.9, 16, 16, 16, 16, 16, 16, 16, 16][cull.north]
+          neighborLevel = level > cull.north ? [14.2, 12.5, 10.5, 9, 7, 5.3, 3.7, 1.9, 16, 16, 16, 16, 16, 16, 16, 16][cull.north] : 0
         } else {
           pos[2] = pos[2] + zFightingThreshold
           pos[5] = pos[5] + zFightingThreshold
@@ -62,7 +62,7 @@ function liquidRenderer(type: string, level: number, atlas: TextureAtlasProvider
         break;
       case Direction.EAST:
         if (cull.east !== undefined) {
-          neighborLevel = [14.2, 12.5, 10.5, 9, 7, 5.3, 3.7, 1.9, 16, 16, 16, 16, 16, 16, 16, 16][cull.east]
+          neighborLevel = level > cull.east ? [14.2, 12.5, 10.5, 9, 7, 5.3, 3.7, 1.9, 16, 16, 16, 16, 16, 16, 16, 16][cull.east] : 0
         } else {
           pos[0] = pos[0] - zFightingThreshold
           pos[3] = pos[3] - zFightingThreshold
@@ -72,7 +72,7 @@ function liquidRenderer(type: string, level: number, atlas: TextureAtlasProvider
         break;
       case Direction.WEST:
         if (cull.west !== undefined) {
-          neighborLevel = [14.2, 12.5, 10.5, 9, 7, 5.3, 3.7, 1.9, 16, 16, 16, 16, 16, 16, 16, 16][cull.west]
+          neighborLevel = level > cull.west ? [14.2, 12.5, 10.5, 9, 7, 5.3, 3.7, 1.9, 16, 16, 16, 16, 16, 16, 16, 16][cull.west] : 0
         } else {
           pos[0] = pos[0] + zFightingThreshold
           pos[3] = pos[3] + zFightingThreshold
@@ -83,9 +83,9 @@ function liquidRenderer(type: string, level: number, atlas: TextureAtlasProvider
       default:
         break;
     }
-    uv[3] = Math.max(uv[3] - neighborLevel, 0)
-    pos[1] = Math.max(pos[1] + neighborLevel, 0)
-    pos[4] = Math.max(pos[4] + neighborLevel, 0)
+    uv[3] = uv[3] - neighborLevel
+    pos[1] = pos[1] + neighborLevel
+    pos[4] = pos[4] + neighborLevel
   }
 
   return blockModel.getMesh(atlas, {
