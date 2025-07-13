@@ -12,12 +12,8 @@ import { Mesh } from './Mesh.js'
 import type { TextureAtlasProvider, UV } from './TextureAtlas.js'
 
 function liquidRenderer(type: string, level: number, atlas: TextureAtlasProvider, cull: CullWater, tintindex?: number) {
-  const transformation = mat4.create()
-  mat4.translate(transformation, transformation, [8, 8, 8])
-  mat4.scale(transformation, transformation, [0.999, 0.999, 0.999])
-  mat4.translate(transformation, transformation, [-8, -8, -8])
 
-	const y = cull['up'] ? 16 : [14.2, 12.5, 10.5, 9, 7, 5.3, 3.7, 1.9, 16, 16, 16, 16, 16, 16, 16, 16][level]
+	const y = cull.up !== undefined ? 16 : [14.2, 12.5, 10.5, 9, 7, 5.3, 3.7, 1.9, 16, 16, 16, 16, 16, 16, 16, 16][level]
 	const blockModel = new BlockModel(undefined, {
 		still: `block/${type}_still`,
 		flow: `block/${type}_flow`,
@@ -37,24 +33,51 @@ function liquidRenderer(type: string, level: number, atlas: TextureAtlasProvider
   const textureModifier= (uv: UV, pos: number[], direction: Direction | undefined) => {
     var neighborLevel = 0
     switch (direction) {
+      case Direction.DOWN:
+        if (cull.down === undefined) {
+          pos[1] = pos[1] - 0.001
+          pos[4] = pos[4] - 0.001
+          pos[7] = pos[7] - 0.001
+          pos[10] = pos[10] - 0.001
+        }
       case Direction.SOUTH:
         if (cull.south !== undefined) {
           neighborLevel = [14.2, 12.5, 10.5, 9, 7, 5.3, 3.7, 1.9, 16, 16, 16, 16, 16, 16, 16, 16][cull.south]
+        } else {
+          pos[2] = pos[2] - 0.001
+          pos[5] = pos[5] - 0.001
+          pos[8] = pos[8] - 0.001
+          pos[11] = pos[11] - 0.001
         }
         break;
       case Direction.NORTH:
         if (cull.north !== undefined) {
           neighborLevel = [14.2, 12.5, 10.5, 9, 7, 5.3, 3.7, 1.9, 16, 16, 16, 16, 16, 16, 16, 16][cull.north]
+        } else {
+          pos[2] = pos[2] + 0.001
+          pos[5] = pos[5] + 0.001
+          pos[8] = pos[8] + 0.001
+          pos[11] = pos[11] + 0.001
         }
         break;
       case Direction.EAST:
         if (cull.east !== undefined) {
           neighborLevel = [14.2, 12.5, 10.5, 9, 7, 5.3, 3.7, 1.9, 16, 16, 16, 16, 16, 16, 16, 16][cull.east]
+        } else {
+          pos[0] = pos[0] - 0.001
+          pos[3] = pos[3] - 0.001
+          pos[6] = pos[6] - 0.001
+          pos[9] = pos[9] - 0.001
         }
         break;
       case Direction.WEST:
         if (cull.west !== undefined) {
           neighborLevel = [14.2, 12.5, 10.5, 9, 7, 5.3, 3.7, 1.9, 16, 16, 16, 16, 16, 16, 16, 16][cull.west]
+        } else {
+          pos[0] = pos[0] + 0.001
+          pos[3] = pos[3] + 0.001
+          pos[6] = pos[6] + 0.001
+          pos[9] = pos[9] + 0.001
         }
         break;
       default:
@@ -65,7 +88,14 @@ function liquidRenderer(type: string, level: number, atlas: TextureAtlasProvider
     pos[4] = Math.max(pos[4] + neighborLevel, 0)
   }
 
-  return blockModel.getMesh(atlas, Cull.none(), undefined, BlockColors[type]?.({}), textureModifier).transform(transformation)
+  return blockModel.getMesh(atlas, {
+    up: cull.up !== undefined,
+    down: cull.down !== undefined,
+    north: cull.north !== undefined && cull.north >= level,
+    east: cull.east !== undefined && cull.east >= level,
+    south: cull.south !== undefined && cull.south >= level,
+    west: cull.west !== undefined && cull.west >= level,
+  }, undefined, BlockColors[type]?.({}), textureModifier)
 }
 
 const DyeColors: Record<string, Color> = {
